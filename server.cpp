@@ -1,5 +1,6 @@
 #include "server.hpp"
 #include "request.hpp"
+#include "response.hpp"
 
 #include <unistd.h> // read()
 #include <sys/socket.h> // socket(), setsockopt(), bind()...
@@ -60,9 +61,12 @@ void Server::accept_once() {
     request << buffer.data();
 
     Request request_processor(request.str());
+    Response response_processor("<b>Hello</b>");
+    response_processor.set_header("Content-Type", "text/html");
     
-    std::string hello = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\n\r\n<b>Hello</b>"; // string builder or something...
-    send(new_socket, hello.c_str(), hello.length(), 0);
+    std::string response = response_processor.generate();
+
+    send(new_socket, response.c_str(), response.length(), 0);
     close(new_socket);
 }
 
