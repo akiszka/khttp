@@ -7,11 +7,15 @@
 
 #include <string> // std::string, string.c_str()...
 #include <iostream> // std::cout
-#include <stdexcept> // std::runtime_error
+#include <stdexcept> // std::runtime_error, std::invalid_argument
 #include <vector> // std::vector
 #include <sstream> // std::ostringstream
+#include <filesystem> // std::filesystem::path, std::filesystem::is_directory...
+#include <fstream> // std::fstream
+#include <memory> // std::unique_ptr, std::make_unique
 
-Server::Server(int _port) {
+Server::Server(std::string _root, int _port) {
+    root = _root;
     port = _port;
 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
@@ -52,21 +56,22 @@ void Server::accept_once() {
     // the request is read in portions into a buffer of chars and
     // transferred into a stringstream, which can be used to get a string
     // later
-    std::ostringstream request;
+    std::ostringstream request_stream;
 
     while((size_t)read(new_socket, buffer.data(), buffer.capacity()) >= buffer.capacity()) {
-        request << buffer.data();
+        request_stream << buffer.data();
 	buffer.reserve(buffer.capacity()*2);
     }
-    request << buffer.data();
+    request_stream << buffer.data();
 
-    Request request_processor(request.str());
-    Response response_processor("<b>Hello</b>");
-    response_processor.set_header("Content-Type", "text/html");
+    // now a request object is generated and processed by a special function
+    // TODO: make this function swappable
+    Request request(request_stream.str());
+    auto response = process_request(request);
     
-    std::string response = response_processor.generate();
+    std::string response_raw = response->generate();
 
-    send(new_socket, response.c_str(), response.length(), 0);
+    send(new_socket, response_raw.c_str(), response_raw.length(), 0);
     close(new_socket);
 }
 
@@ -74,4 +79,46 @@ void Server::loop() {
     while(true) {
 	accept_once();
     }
+}
+
+std::ifstream Server::find_file(std::filesystem::path requested_path) {
+    std::filesystem::path path = root / requested_path.relative_path();
+	
+    if (std::filesystem::is_directory(path)) {
+	path /= "index.html";
+    }
+    
+    if (!std::filesystem::exists(path)) {
+	throw std::invalid_argument("Doesn't exist");
+    }
+
+    return std::ifstream(path);
+}
+
+std::unique_ptr<Response> Server::process_request(const Request& req) {
+    std::ifstream requested_file;
+
+    // try to open the file or index.html
+    // TODO: generic function for errors
+    try {
+	requested_file = find_file(req.get_path());
+    } catch (const std::invalid_argument& ia) {
+	// return a 404 if the file doesn't exist
+	auto response = std::make_unique<Response>("The file does not exist.");
+	response->set_status(Response::NOT_FOUND);
+	return response;
+    }
+
+    // read the requested file into a string
+    std::string contents;
+    requested_file.seekg(0, std::ios::end);
+    contents.resize(requested_file.tellg());
+    requested_file.seekg(0, std::ios::beg);
+    requested_file.read(&contents[0], contents.size());
+    requested_file.close();
+
+
+    auto response = std::make_unique<Response>(contents);
+    response->set_header("Content-Type", "text/html");
+    return response;
 }

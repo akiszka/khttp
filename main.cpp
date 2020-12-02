@@ -26,7 +26,7 @@
     }*/
 
 int main () {
-    Server server(8080);
+    Server server("./www");
     server.loop();
     return 0;
 }
