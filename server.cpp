@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include "request.hpp"
 
 #include <unistd.h> // read()
 #include <sys/socket.h> // socket(), setsockopt(), bind()...
@@ -58,9 +59,8 @@ void Server::accept_once() {
     }
     request << buffer.data();
 
-    std::cout << "*** START REQUEST ***" << std::endl;
-    std::cout << request.str() << std::endl;
-    std::cout << "*** END REQUEST ***" << std::endl;
+    Request request_processor(request.str());
+    
     std::string hello = "HTTP/1.1 200 OK\r\nContent-type: text/html\r\n\r\n<b>Hello</b>"; // string builder or something...
     send(new_socket, hello.c_str(), hello.length(), 0);
     close(new_socket);

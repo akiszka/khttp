@@ -1,7 +1,7 @@
 CC := clang++
 CFLAGS := -std=c++17 -O0 -g -Wall -Wextra
 
-OBJS = main.o server.o
+OBJS = main.o server.o request.o
 
 .PHONY: all clean test
 
