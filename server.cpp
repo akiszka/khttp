@@ -2,7 +2,7 @@
 #include "request.hpp"
 #include "response.hpp"
 
-#include <unistd.h> // read()
+#include <unistd.h> // read(), send()
 #include <sys/socket.h> // socket(), setsockopt(), bind()...
 
 #include <string> // std::string, string.c_str()...
@@ -95,19 +95,32 @@ std::filesystem::path Server::find_file(std::filesystem::path requested_path) {
     return path;
 }
 
+std::string Server::extension_to_mimetype(std::string extension) {
+    if (extension == ".html" || extension == ".htm")
+	return "text/html";
+    else if (extension == ".css")
+	return "text/css";
+    else if (extension == ".js")
+	return "text/javascript";
+    else if (extension == ".jpg" || extension == ".jpeg")
+	return "image/jpeg";
+    else if (extension == ".png")
+	return "image/png";
+    else if (extension == ".txt")
+	return "text/plain";
+    else
+	return "application/octet-stream";
+}
+
 std::unique_ptr<Response> Server::process_request(const Request& req) {
     std::filesystem::path filename;
 
     // try to open the file or index.html
-    // TODO: generic function for errors
     try {
 	filename = find_file(req.get_path());
     } catch (const std::invalid_argument& ia) {
 	// return a 404 if the file doesn't exist
-	auto response = std::make_unique<Response>("The file does not exist.");
-	response->set_status(Response::NOT_FOUND);
-	response->set_header("Content-Type", "text/plain");
-	return response;
+	return std::make_unique<Response>(Response::generate_error_message(Response::NOT_FOUND));
     }
 
     std::ifstream requested_file(filename);
@@ -120,22 +133,7 @@ std::unique_ptr<Response> Server::process_request(const Request& req) {
     requested_file.read(&contents[0], contents.size());
 
     auto response = std::make_unique<Response>(contents);
-    
-    std::string extension = filename.extension();
-    if (extension == ".html" || extension == ".htm")
-	response->set_header("Content-Type", "text/html");
-    else if (extension == ".css")
-	response->set_header("Content-Type", "text/css");
-    else if (extension == ".js")
-	response->set_header("Content-Type", "text/javascript");
-    else if (extension == ".jpg" || extension == ".jpeg")
-	response->set_header("Content-Type", "image/jpeg");
-    else if (extension == ".png")
-	response->set_header("Content-Type", "image/png");
-    else if (extension == ".txt")
-	response->set_header("Content-Type", "text/plain");
-    else
-	response->set_header("Content-Type", "application/octet-stream");
+    response->set_header("Content-Type", extension_to_mimetype(filename.extension()));    
 	
     return response;
 }

@@ -30,14 +30,19 @@ public:
 	LOOP_DETECTED = 508,
     };
 
-    Response(std::string _body);
+    Response(std::string _body = "");
     void set_header(std::string key, std::string value);
     void set_status(Status _status);
+    void set_body(std::string _body);
     std::string generate() const;
+    static Response generate_error_message(const Status _status);
+    
 protected:
     Status status = OK;
     std::map<std::string, std::string> headers;
     std::string body;
+
+    std::string get_status_message() const;
 };
 
 #endif // RESPONSE_HPP
