@@ -20,7 +20,7 @@ class Server {
     std::vector<char> buffer;
     std::filesystem::path root;
 
-    std::ifstream find_file(std::filesystem::path requested_path);
+    std::filesystem::path find_file(std::filesystem::path requested_path);
     std::unique_ptr<Response> process_request(const Request& req);
     
 public:

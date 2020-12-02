@@ -1,5 +1,5 @@
 CC := clang++
-CFLAGS := -std=c++17 -O0 -g -Wall -Wextra
+CFLAGS := -std=c++17 -O3 -g -Wall -Wextra
 
 OBJS = main.o server.o request.o response.o
 

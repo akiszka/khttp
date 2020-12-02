@@ -81,7 +81,7 @@ void Server::loop() {
     }
 }
 
-std::ifstream Server::find_file(std::filesystem::path requested_path) {
+std::filesystem::path Server::find_file(std::filesystem::path requested_path) {
     std::filesystem::path path = root / requested_path.relative_path();
 	
     if (std::filesystem::is_directory(path)) {
@@ -92,33 +92,50 @@ std::ifstream Server::find_file(std::filesystem::path requested_path) {
 	throw std::invalid_argument("Doesn't exist");
     }
 
-    return std::ifstream(path);
+    return path;
 }
 
 std::unique_ptr<Response> Server::process_request(const Request& req) {
-    std::ifstream requested_file;
+    std::filesystem::path filename;
 
     // try to open the file or index.html
     // TODO: generic function for errors
     try {
-	requested_file = find_file(req.get_path());
+	filename = find_file(req.get_path());
     } catch (const std::invalid_argument& ia) {
 	// return a 404 if the file doesn't exist
 	auto response = std::make_unique<Response>("The file does not exist.");
 	response->set_status(Response::NOT_FOUND);
+	response->set_header("Content-Type", "text/plain");
 	return response;
     }
 
+    std::ifstream requested_file(filename);
+    
     // read the requested file into a string
     std::string contents;
     requested_file.seekg(0, std::ios::end);
     contents.resize(requested_file.tellg());
     requested_file.seekg(0, std::ios::beg);
     requested_file.read(&contents[0], contents.size());
-    requested_file.close();
-
 
     auto response = std::make_unique<Response>(contents);
-    response->set_header("Content-Type", "text/html");
+    
+    std::string extension = filename.extension();
+    if (extension == ".html" || extension == ".htm")
+	response->set_header("Content-Type", "text/html");
+    else if (extension == ".css")
+	response->set_header("Content-Type", "text/css");
+    else if (extension == ".js")
+	response->set_header("Content-Type", "text/javascript");
+    else if (extension == ".jpg" || extension == ".jpeg")
+	response->set_header("Content-Type", "image/jpeg");
+    else if (extension == ".png")
+	response->set_header("Content-Type", "image/png");
+    else if (extension == ".txt")
+	response->set_header("Content-Type", "text/plain");
+    else
+	response->set_header("Content-Type", "application/octet-stream");
+	
     return response;
 }
