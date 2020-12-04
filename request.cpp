@@ -2,6 +2,7 @@
 
 #include <sstream> // std::stringstream
 #include <string> // std::string
+#include <stdexcept> // std::invalid_argument
 
 Request::Request(std::string req) {
     std::istringstream req_stream(req);
@@ -17,8 +18,15 @@ Request::Request(std::string req) {
 	    // find the request type
 	    line_stream >> word;
 	    if ("GET" == word) method = Method::GET;
+	    else if ("HEAD" == word) method = Method::HEAD;
 	    else if ("POST" == word) method = Method::POST;
-	    else method = Method::UNIMPLEMENTED;
+	    else if ("PUT" == word) method = Method::PUT;
+	    else if ("DELETE" == word) method = Method::DELETE;
+	    else if ("CONNECT" == word) method = Method::CONNECT;
+	    else if ("OPTIONS" == word) method = Method::OPTIONS;
+	    else if ("TRACE" == word) method = Method::TRACE;
+	    else if ("PATCH" == word) method = Method::PATCH;
+	    else throw std::invalid_argument("Bad request method.");
 
 	    // find the requested path
 	    line_stream >> word;

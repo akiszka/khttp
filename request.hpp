@@ -8,8 +8,15 @@ class Request {
 public:
     enum class Method {
 	GET,
+	HEAD,
 	POST,
-	UNIMPLEMENTED
+	PUT,
+	DELETE,
+	CONNECT,
+	OPTIONS,
+	TRACE,
+	PATCH,
+	_OTHER // a different, unimplemented method
     };
 
     Request(std::string req);

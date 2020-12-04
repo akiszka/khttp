@@ -14,10 +14,24 @@
 #include <fstream> // std::fstream
 #include <memory> // std::unique_ptr, std::make_unique
 
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
+SSL_CTX *create_context();
+void configure_context(SSL_CTX *ctx);
+void cleanup_openssl();
+void init_openssl();
+    
+SSL_CTX *ctx;
+
 Server::Server(std::string _root, int _port) {
     root = _root;
     port = _port;
 
+    init_openssl();
+    ctx = create_context();
+    configure_context(ctx);
+    
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
 	throw std::runtime_error("Socket init failed.");
     }
@@ -44,6 +58,8 @@ Server::Server(std::string _root, int _port) {
 
 Server::~Server() {
     close(server_fd);
+    SSL_CTX_free(ctx);
+    cleanup_openssl();
 }
 
 void Server::accept_once() {
@@ -53,25 +69,46 @@ void Server::accept_once() {
 	throw std::runtime_error("Accept() failed.");
     }
 
+    SSL *ssl = SSL_new(ctx);    
+    SSL_set_fd(ssl, new_socket);
+    if (SSL_accept(ssl) <= 0) {
+	// if SSL doesn't work, we just close and return
+	ERR_print_errors_fp(stderr);
+
+	SSL_shutdown(ssl);
+	SSL_free(ssl);
+	close(new_socket);
+	return;
+    }
+
     // the request is read in portions into a buffer of chars and
     // transferred into a stringstream, which can be used to get a string
     // later
     std::ostringstream request_stream;
-
-    while((size_t)read(new_socket, buffer.data(), buffer.capacity()) >= buffer.capacity()) {
+    
+    while((size_t)SSL_read(ssl, buffer.data(), buffer.capacity()) >= buffer.capacity()) {
         request_stream << buffer.data();
 	buffer.reserve(buffer.capacity()*2);
     }
     request_stream << buffer.data();
-
+    
     // now a request object is generated and processed by a special function
     // TODO: make this function swappable
-    Request request(request_stream.str());
-    auto response = process_request(request);
+
+    std::unique_ptr<Response> response;
+    try {
+	Request request(request_stream.str());
+	response = process_request(request);
+    } catch (const std::invalid_argument& ia) {
+	response = std::make_unique<Response>(Response::generate_error_message(Response::BAD_REQUEST));
+    }
     
     std::string response_raw = response->generate();
 
-    send(new_socket, response_raw.c_str(), response_raw.length(), 0);
+    SSL_write(ssl, response_raw.c_str(), response_raw.length());
+    
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
     close(new_socket);
 }
 
@@ -113,6 +150,11 @@ std::string Server::extension_to_mimetype(std::string extension) {
 }
 
 std::unique_ptr<Response> Server::process_request(const Request& req) {
+    if (req.get_method() != Request::Method::GET) {
+	return std::make_unique<Response>(Response::generate_error_message(Response::BAD_REQUEST));
+    }
+    
+    
     std::filesystem::path filename;
 
     // try to open the file or index.html
@@ -136,4 +178,48 @@ std::unique_ptr<Response> Server::process_request(const Request& req) {
     response->set_header("Content-Type", extension_to_mimetype(filename.extension()));    
 	
     return response;
+}
+
+void init_openssl()
+{ 
+    SSL_load_error_strings();	
+    OpenSSL_add_ssl_algorithms();
+}
+
+void cleanup_openssl()
+{
+    EVP_cleanup();
+}
+
+SSL_CTX *create_context()
+{
+    const SSL_METHOD *method;
+    SSL_CTX *ctx;
+
+    method = SSLv23_server_method();
+
+    ctx = SSL_CTX_new(method);
+    if (!ctx) {
+	perror("Unable to create SSL context");
+	ERR_print_errors_fp(stderr);
+	exit(EXIT_FAILURE);
+    }
+
+    return ctx;
+}
+
+void configure_context(SSL_CTX *ctx)
+{
+    SSL_CTX_set_ecdh_auto(ctx, 1);
+
+    /* Set the key and cert */
+    if (SSL_CTX_use_certificate_file(ctx, "crt/crt", SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+	exit(EXIT_FAILURE);
+    }
+
+    if (SSL_CTX_use_PrivateKey_file(ctx, "crt/key", SSL_FILETYPE_PEM) <= 0 ) {
+        ERR_print_errors_fp(stderr);
+	exit(EXIT_FAILURE);
+    }
 }
