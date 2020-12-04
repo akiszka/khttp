@@ -1,6 +1,7 @@
 #include "server.hpp"
 #include "request.hpp"
 #include "response.hpp"
+#include "securesocket.hpp"
 
 #include <unistd.h> // read(), send()
 #include <sys/socket.h> // socket(), setsockopt(), bind()...
@@ -63,41 +64,28 @@ Server::~Server() {
 }
 
 void Server::accept_once() {
-    int new_socket;
-    if ((new_socket = accept(server_fd, (struct sockaddr *)&address,
+    int new_fd;
+    SecureSocket new_socket;
+    if ((new_fd = accept(server_fd, (struct sockaddr *)&address,
 			     (socklen_t*)&addrlen))<0) {
 	throw std::runtime_error("Accept() failed.");
     }
 
-    SSL *ssl = SSL_new(ctx);    
-    SSL_set_fd(ssl, new_socket);
-    if (SSL_accept(ssl) <= 0) {
-	// if SSL doesn't work, we just close and return
-	ERR_print_errors_fp(stderr);
-
-	SSL_shutdown(ssl);
-	SSL_free(ssl);
-	close(new_socket);
+    try {
+	new_socket.init(new_fd, ctx);
+    } catch (const std::runtime_error& re) {
 	return;
     }
 
-    // the request is read in portions into a buffer of chars and
-    // transferred into a stringstream, which can be used to get a string
-    // later
-    std::ostringstream request_stream;
-    
-    while((size_t)SSL_read(ssl, buffer.data(), buffer.capacity()) >= buffer.capacity()) {
-        request_stream << buffer.data();
-	buffer.reserve(buffer.capacity()*2);
-    }
-    request_stream << buffer.data();
+    std::string request_raw;
+    new_socket.read(request_raw);
     
     // now a request object is generated and processed by a special function
     // TODO: make this function swappable
 
     std::unique_ptr<Response> response;
     try {
-	Request request(request_stream.str());
+	Request request(request_raw);
 	response = process_request(request);
     } catch (const std::invalid_argument& ia) {
 	response = std::make_unique<Response>(Response::generate_error_message(Response::BAD_REQUEST));
@@ -105,11 +93,7 @@ void Server::accept_once() {
     
     std::string response_raw = response->generate();
 
-    SSL_write(ssl, response_raw.c_str(), response_raw.length());
-    
-    SSL_shutdown(ssl);
-    SSL_free(ssl);
-    close(new_socket);
+    new_socket.write(response_raw);
 }
 
 void Server::loop() {

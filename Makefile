@@ -2,7 +2,7 @@ CC = clang++
 CFLAGS = -std=c++17 -O3 -g -Wall -Wextra
 LINKFLAGS = -lssl -lcrypto
 
-OBJS = main.o server.o request.o response.o
+OBJS = main.o server.o request.o response.o securesocket.o
 
 .PHONY: all clean test certs cleancerts
 
