@@ -15,23 +15,15 @@
 #include <fstream> // std::fstream
 #include <memory> // std::unique_ptr, std::make_unique
 
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-
-SSL_CTX *create_context();
-void configure_context(SSL_CTX *ctx);
-void cleanup_openssl();
-void init_openssl();
-    
-SSL_CTX *ctx;
+#include <openssl/ssl.h> // SSL_*
+#include <openssl/err.h> // ERR_print_errors_fp()
 
 Server::Server(std::string _root, int _port) {
     root = _root;
     port = _port;
 
     init_openssl();
-    ctx = create_context();
-    configure_context(ctx);
+    create_context();
     
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
 	throw std::runtime_error("Socket init failed.");
@@ -53,8 +45,6 @@ Server::Server(std::string _root, int _port) {
     if (listen(server_fd, 3) < 0) {
 	throw std::runtime_error("Listening on a socker failed.");
     }
-
-    buffer.reserve(256);
 }
 
 Server::~Server() {
@@ -164,21 +154,17 @@ std::unique_ptr<Response> Server::process_request(const Request& req) {
     return response;
 }
 
-void init_openssl()
-{ 
-    SSL_load_error_strings();	
+void Server::init_openssl() {
+    SSL_load_error_strings();
     OpenSSL_add_ssl_algorithms();
 }
 
-void cleanup_openssl()
-{
+void Server::cleanup_openssl() {
     EVP_cleanup();
 }
 
-SSL_CTX *create_context()
-{
+void Server::create_context() {
     const SSL_METHOD *method;
-    SSL_CTX *ctx;
 
     method = SSLv23_server_method();
 
@@ -189,11 +175,6 @@ SSL_CTX *create_context()
 	exit(EXIT_FAILURE);
     }
 
-    return ctx;
-}
-
-void configure_context(SSL_CTX *ctx)
-{
     SSL_CTX_set_ecdh_auto(ctx, 1);
 
     /* Set the key and cert */

@@ -24,11 +24,12 @@ clean:
 certs: crt/csr crt/crt
 
 crt/csr:
+	mkdir -p crt
 	openssl req -new -newkey rsa:4096 -nodes \
 	-keyout crt/key -out crt/csr \
 	-subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"
 
-crt/crt:
+crt/crt: crt/csr
 	openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
 	-subj "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com" \
 	-keyout crt/key  -out crt/crt
