@@ -14,6 +14,8 @@
 #include <filesystem> // std::filesystem::path, std::filesystem::is_directory...
 #include <fstream> // std::fstream
 #include <memory> // std::unique_ptr, std::make_unique
+#include <thread> // std::thread
+#include <signal.h> // signal(SIGPIPE, SIG_IGN)
 
 #include <openssl/ssl.h> // SSL_*
 #include <openssl/err.h> // ERR_print_errors_fp()
@@ -24,6 +26,10 @@ Server::Server(std::string _root, int _port) {
 
     init_openssl();
     create_context();
+
+    // when the client happens to close connection before writing,
+    // I don't want the program to crash with SIGPIPE
+    signal(SIGPIPE, SIG_IGN);
     
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
 	throw std::runtime_error("Socket init failed.");
@@ -49,20 +55,26 @@ Server::Server(std::string _root, int _port) {
 
 Server::~Server() {
     close(server_fd);
-    SSL_CTX_free(ctx);
     cleanup_openssl();
 }
 
 void Server::accept_once() {
     int new_fd;
-    SecureSocket new_socket;
+    
     if ((new_fd = accept(server_fd, (struct sockaddr *)&address,
 			     (socklen_t*)&addrlen))<0) {
 	throw std::runtime_error("Accept() failed.");
     }
 
+    std::thread serve_requesting_thread(&Server::serve_requesting_socket, this, std::ref(new_fd));
+    serve_requesting_thread.detach();
+}
+
+void Server::serve_requesting_socket(const int& fd) {
+    SecureSocket new_socket;
+    
     try {
-	new_socket.init(new_fd, ctx);
+	new_socket.init(fd, ctx);
     } catch (const std::runtime_error& re) {
 	return;
     }
@@ -160,6 +172,7 @@ void Server::init_openssl() {
 }
 
 void Server::cleanup_openssl() {
+    SSL_CTX_free(ctx);
     EVP_cleanup();
 }
 

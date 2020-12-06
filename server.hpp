@@ -27,6 +27,7 @@ class Server {
 
     std::filesystem::path find_file(std::filesystem::path requested_path);
     static std::string extension_to_mimetype(std::string extension);
+    void serve_requesting_socket(const int& fd);
     std::unique_ptr<Response> process_request(const Request& req);
     
     void create_context();

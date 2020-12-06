@@ -1,12 +1,12 @@
 CC = clang++
-CFLAGS = -std=c++17 -O3 -g -Wall -Wextra
-LINKFLAGS = -lssl -lcrypto
+CFLAGS = -std=c++20 -O3 -g -Wall -Wextra
+LINKFLAGS = -lssl -lcrypto -lpthread
 
 OBJS = main.o server.o request.o response.o securesocket.o
 
 .PHONY: all clean test certs cleancerts
 
-all: server
+all: server certs
 
 # CODE *******************************************
 
