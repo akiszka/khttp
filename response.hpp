@@ -35,7 +35,7 @@ public:
     void set_status(Status _status);
     void set_body(std::string _body);
     std::string generate() const;
-    static Response generate_error_message(const Status _status);
+    static Response generate_error_message(const Status _status, std::string&& message);
     
 protected:
     Status status = OK;

@@ -19,7 +19,7 @@ public:
 	_OTHER // a different, unimplemented method
     };
 
-    Request(std::string req);
+    Request(std::string&& req);
     Method get_method() const;
     std::string get_path() const;
     std::string get_version() const;

@@ -1,12 +1,11 @@
 #include "securesocket.hpp"
+#include "response.hpp"
 
 #include <string> // std::string
-#include <sstream> // std::ostringstream
 #include <vector> // std::vector
 #include <stdexcept> // std::runtime_error
 #include <openssl/ssl.h> // SSL_*
-#include <openssl/err.h> // ERR_print_errors_fp()
-#include <unistd.h> // close()
+#include <unistd.h> // close(), write()
 
 SecureSocket::SecureSocket(int _fd, SSL_CTX *ctx) {
     init(_fd, ctx);
@@ -29,7 +28,11 @@ void SecureSocket::init(int _fd, SSL_CTX *ctx) {
 	// if SSL doesn't work, we just close and throw
 	// ERR_print_errors_fp(stdout);
 
-	std::string message = "HTTPS only.";
+	
+	std::string message = Response::generate_error_message(
+	    Response::NOT_IMPLEMENTED,
+	    "HTTPS only."
+	    ).generate();
 	::write(fd, message.c_str(), message.length());
 	
 	SSL_shutdown(ssl);
@@ -52,20 +55,27 @@ int SecureSocket::read(std::string& message) {
     if (!initialized) return 0;
     
     std::vector<char> buffer;
-    buffer.reserve(64);
-    
-    // the request is read in portions into a buffer of chars and
-    // transferred into a stringstream, which can be used to get a string
-    // later
-    std::ostringstream request_stream;
-    
-    while((size_t)SSL_read(ssl, buffer.data(), buffer.capacity()) >= buffer.capacity()) {
-        request_stream << buffer.data();
-	buffer.reserve(buffer.capacity()*2);
+    buffer.resize(64);
+
+    size_t bytes_read_total = 0;
+    while (true) {
+	size_t bytes_read_now =
+	    SSL_read(ssl,
+		     buffer.data()+bytes_read_total,
+		     buffer.size()-bytes_read_total);
+	
+	if (bytes_read_now < buffer.size()-bytes_read_total) break;
+	
+	bytes_read_total += bytes_read_now;
+	
+	if (buffer.size() >= 1024) {
+	    throw std::runtime_error("Too long request.");
+	} else {
+	    buffer.resize(buffer.size()*2);
+	}
     }
-    request_stream << buffer.data();
 
-    message = request_stream.str();
-
+    message = std::string(buffer.data());
+        
     return message.length();
 }

@@ -7,7 +7,7 @@
 #include <sys/socket.h> // socket(), setsockopt(), bind()...
 
 #include <string> // std::string, string.c_str()...
-#include <iostream> // std::cout
+#include <iostream> // std::cout, std::cerr
 #include <stdexcept> // std::runtime_error, std::invalid_argument
 #include <filesystem> // std::filesystem::path, std::filesystem::is_directory...
 #include <memory> // std::unique_ptr, std::make_unique
@@ -65,6 +65,7 @@ void Server::accept_once() {
     }
 
     while (numthreads >= maxthreads);
+    
     std::thread serve_requesting_thread(&Server::serve_requesting_socket, this, std::ref(new_fd));
     serve_requesting_thread.detach();
 }
@@ -80,18 +81,22 @@ void Server::serve_requesting_socket(const int& fd) {
 	return;
     }
 
-    std::string request_raw;
-    new_socket.read(request_raw);
-    
-    // now a request object is generated and processed by a special function
-    // TODO: make this function swappable
-
     std::unique_ptr<Response> response;
     try {
-	Request request(request_raw);
+	// read the data that was sent
+	std::string request_raw;
+	new_socket.read(request_raw);
+	
+	// now a request object is generated and processed
+	// TODO: make this function swappable
+	Request request(std::move(request_raw));
 	response = process_request(request);
-    } catch (const std::invalid_argument& ia) {
-	response = std::make_unique<Response>(Response::generate_error_message(Response::BAD_REQUEST));
+    } catch (const std::exception& e) {
+	response = std::make_unique<Response>(
+	    Response::generate_error_message(Response::INTERNAL_SERVER_ERROR,
+					     "Error."));
+	std::cerr << e.what() << std::endl;
+	    
     }
     
     std::string response_raw = response->generate();
@@ -140,7 +145,9 @@ std::string Server::extension_to_mimetype(std::string extension) {
 
 std::unique_ptr<Response> Server::process_request(const Request& req) {
     if (req.get_method() != Request::Method::GET) {
-	return std::make_unique<Response>(Response::generate_error_message(Response::BAD_REQUEST));
+	return std::make_unique<Response>(
+	    Response::generate_error_message(Response::BAD_REQUEST,
+		"Wrong request method."));
     }
     
     
@@ -151,7 +158,13 @@ std::unique_ptr<Response> Server::process_request(const Request& req) {
 	filename = find_file(req.get_path());
     } catch (const std::invalid_argument& ia) {
 	// return a 404 if the file doesn't exist
-	return std::make_unique<Response>(Response::generate_error_message(Response::NOT_FOUND));
+	return std::make_unique<Response>(
+	    Response::generate_error_message(Response::NOT_FOUND,
+	    "File not found: " + req.get_path()));
+    } catch (const std::filesystem::filesystem_error& fse) {
+	return std::make_unique<Response>(
+	    Response::generate_error_message(Response::BAD_REQUEST,
+					     "Filename too long."));
     }
 
     std::ifstream requested_file(filename);

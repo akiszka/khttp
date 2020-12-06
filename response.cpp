@@ -34,11 +34,11 @@ std::string Response::generate() const {
     return response.str();
 }
 
-Response Response::generate_error_message(const Status _status) {
+Response Response::generate_error_message(const Status _status, std::string&& message) {
     Response response;
     response.set_header("Content-Type", "text/html");
     response.set_status(_status);
-    response.set_body("<h1><marquee>" + response.get_status_message() + "</marquee></h1>");
+    response.set_body("<h1><marquee>" + response.get_status_message() + "</marquee></h1><br>" + message);
     return response;
 }
 

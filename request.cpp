@@ -4,7 +4,7 @@
 #include <string> // std::string
 #include <stdexcept> // std::invalid_argument
 
-Request::Request(std::string req) {
+Request::Request(std::string&& req) {
     std::istringstream req_stream(req);
     std::string line;
     int state = 0; // 0 - waiting for the first line, 1 - processing headers, 2 - processing response body
