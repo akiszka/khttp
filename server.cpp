@@ -3,16 +3,13 @@
 #include "response.hpp"
 #include "securesocket.hpp"
 
-#include <unistd.h> // read(), send()
+#include <unistd.h> // close()
 #include <sys/socket.h> // socket(), setsockopt(), bind()...
 
 #include <string> // std::string, string.c_str()...
 #include <iostream> // std::cout
 #include <stdexcept> // std::runtime_error, std::invalid_argument
-#include <vector> // std::vector
-#include <sstream> // std::ostringstream
 #include <filesystem> // std::filesystem::path, std::filesystem::is_directory...
-#include <fstream> // std::fstream
 #include <memory> // std::unique_ptr, std::make_unique
 #include <thread> // std::thread
 #include <signal.h> // signal(SIGPIPE, SIG_IGN)
@@ -20,10 +17,11 @@
 #include <openssl/ssl.h> // SSL_*
 #include <openssl/err.h> // ERR_print_errors_fp()
 
-Server::Server(std::string _root, int _port) {
+Server::Server(std::string _root, int _port, int _maxthreads) {
     root = _root;
     port = _port;
-
+    maxthreads = _maxthreads;
+    
     init_openssl();
     create_context();
 
@@ -66,11 +64,14 @@ void Server::accept_once() {
 	throw std::runtime_error("Accept() failed.");
     }
 
+    while (numthreads >= maxthreads);
     std::thread serve_requesting_thread(&Server::serve_requesting_socket, this, std::ref(new_fd));
     serve_requesting_thread.detach();
 }
 
 void Server::serve_requesting_socket(const int& fd) {
+    ++numthreads;
+    
     SecureSocket new_socket;
     
     try {
@@ -96,6 +97,8 @@ void Server::serve_requesting_socket(const int& fd) {
     std::string response_raw = response->generate();
 
     new_socket.write(response_raw);
+
+    --numthreads;
 }
 
 void Server::loop() {

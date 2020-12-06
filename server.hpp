@@ -11,12 +11,16 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <atomic>
 #include <openssl/ssl.h>
 
 class Server {
     int port;
     int server_fd;
-
+    
+    std::atomic_int numthreads = 0;
+    int maxthreads;
+    
     int opt = 1;
     struct sockaddr_in address;
     int addrlen = sizeof(address);
@@ -34,7 +38,7 @@ class Server {
     void cleanup_openssl();
     void init_openssl();
 public:
-    Server(std::string _root, int _port = 8080);
+    Server(std::string _root, int _port = 8080, int _maxthreads = 12);
     ~Server();
     void accept_once();
     void loop();
