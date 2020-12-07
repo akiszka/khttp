@@ -33,7 +33,7 @@ void SecureSocket::init(int _fd, SSL_CTX *ctx) {
 	    Response::NOT_IMPLEMENTED,
 	    "HTTPS only."
 	    ).generate();
-	::write(fd, message.c_str(), message.length());
+	(void) ::write(fd, message.c_str(), message.length());
 	
 	SSL_shutdown(ssl);
 	SSL_free(ssl);
@@ -59,10 +59,10 @@ int SecureSocket::read(std::string& message) {
 
     size_t bytes_read_total = 0;
     while (true) {
-	size_t bytes_read_now =
-	    SSL_read(ssl,
-		     buffer.data()+bytes_read_total,
-		     buffer.size()-bytes_read_total);
+	size_t bytes_read_now = SSL_read(
+	    ssl,
+	    buffer.data()+bytes_read_total,
+	    buffer.size()-bytes_read_total);
 	
 	if (bytes_read_now < buffer.size()-bytes_read_total) break;
 	

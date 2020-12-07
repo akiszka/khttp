@@ -30,7 +30,7 @@ Server::Server(std::string _root, int _port, int _maxthreads) {
     // when the client happens to close connection before writing,
     // I don't want the program to crash with SIGPIPE
     {
-	struct sigaction sigpipe;
+	struct sigaction sigpipe{};
 	sigpipe.sa_handler = SIG_IGN;
 	sigpipe.sa_flags = 0;
 	sigaction(SIGPIPE, &sigpipe, NULL);
@@ -124,8 +124,8 @@ void Server::loop() {
     loop_running = true;
     
     // add a new handler for ctrl+c
-    struct sigaction sigint_new;
-    struct sigaction sigint_old;
+    struct sigaction sigint_new{};
+    struct sigaction sigint_old{};
     sigint_new.sa_handler = &Server::loop_sigint_handler;
     sigint_new.sa_flags = 0;
     sigaction(SIGINT, &sigint_new, &sigint_old);
@@ -142,7 +142,7 @@ void Server::loop() {
     std::cout.flush();
     
     // after the server stops running, re-establish the old handler
-    // sigaction(SIGINT, &sigint_old, NULL);
+    sigaction(SIGINT, &sigint_old, NULL);
 }
 
 std::filesystem::path Server::find_file(std::filesystem::path requested_path) {
