@@ -17,6 +17,8 @@
 #include <openssl/ssl.h> // SSL_*
 #include <openssl/err.h> // ERR_print_errors_fp()
 
+volatile sig_atomic_t loop_running = false; // I hate this.
+
 Server::Server(std::string _root, int _port, int _maxthreads) {
     root = _root;
     port = _port;
@@ -27,7 +29,12 @@ Server::Server(std::string _root, int _port, int _maxthreads) {
 
     // when the client happens to close connection before writing,
     // I don't want the program to crash with SIGPIPE
-    signal(SIGPIPE, SIG_IGN);
+    {
+	struct sigaction sigpipe;
+	sigpipe.sa_handler = SIG_IGN;
+	sigpipe.sa_flags = 0;
+	sigaction(SIGPIPE, &sigpipe, NULL);
+    }
     
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
 	throw std::runtime_error("Socket init failed.");
@@ -106,10 +113,36 @@ void Server::serve_requesting_socket(const int& fd) {
     --numthreads;
 }
 
+extern "C" void Server::loop_sigint_handler(int signum) {
+    (void)signum;
+    loop_running = false;
+}
+
 void Server::loop() {
-    while(true) {
-	accept_once();
+    
+    // there is an assumption only one loop can be running at a time
+    loop_running = true;
+    
+    // add a new handler for ctrl+c
+    struct sigaction sigint_new;
+    struct sigaction sigint_old;
+    sigint_new.sa_handler = &Server::loop_sigint_handler;
+    sigint_new.sa_flags = 0;
+    sigaction(SIGINT, &sigint_new, &sigint_old);
+
+    std::cout << "Entering a server loop... Press CTRL+C to exit." << std::endl;
+    
+    while (loop_running) {
+	try {
+	    accept_once();
+	} catch (...) {}
     }
+
+    std::cout << "Exiting the loop..." << std::endl;
+    std::cout.flush();
+    
+    // after the server stops running, re-establish the old handler
+    // sigaction(SIGINT, &sigint_old, NULL);
 }
 
 std::filesystem::path Server::find_file(std::filesystem::path requested_path) {

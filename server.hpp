@@ -31,12 +31,16 @@ class Server {
 
     std::filesystem::path find_file(std::filesystem::path requested_path);
     static std::string extension_to_mimetype(std::string extension);
+    
     void serve_requesting_socket(const int& fd);
     std::unique_ptr<Response> process_request(const Request& req);
+    
+    static void loop_sigint_handler(int signum);
     
     void create_context();
     void cleanup_openssl();
     void init_openssl();
+    
 public:
     Server(std::string _root, int _port = 8080, int _maxthreads = 12);
     ~Server();
