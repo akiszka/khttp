@@ -37,12 +37,12 @@ class Server {
     
     static void loop_sigint_handler(int signum);
     
-    void create_context();
+    void create_openssl_context(const std::string& cert_filename, const std::string& key_filename);
     void cleanup_openssl();
     void init_openssl();
     
 public:
-    Server(std::string _root, int _port = 8080, int _maxthreads = 12);
+    Server(std::string _root, std::string cert_filename, std::string key_filename, int _port = 8080, int _maxthreads = 12);
     ~Server();
     void accept_once();
     void loop();

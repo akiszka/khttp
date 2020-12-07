@@ -12,24 +12,28 @@
 #include <filesystem> // std::filesystem::path, std::filesystem::is_directory...
 #include <memory> // std::unique_ptr, std::make_unique
 #include <thread> // std::thread
-#include <signal.h> // signal(SIGPIPE, SIG_IGN)
+#include <signal.h> // sigaction()
 
 #include <openssl/ssl.h> // SSL_*
 #include <openssl/err.h> // ERR_print_errors_fp()
 
 volatile sig_atomic_t loop_running = false; // I hate this.
 
-Server::Server(std::string _root, int _port, int _maxthreads) {
+Server::Server(std::string _root,
+	       std::string cert_filename,
+	       std::string key_filename,
+	       int _port,
+	       int _maxthreads) {
     root = _root;
     port = _port;
     maxthreads = _maxthreads;
     
     init_openssl();
-    create_context();
+    create_openssl_context(cert_filename, key_filename);
 
-    // when the client happens to close connection before writing,
-    // I don't want the program to crash with SIGPIPE
     {
+	// when the client happens to close connection before writing,
+	// I don't want the program to crash with SIGPIPE
 	struct sigaction sigpipe{};
 	sigpipe.sa_handler = SIG_IGN;
 	sigpipe.sa_flags = 0;
@@ -225,14 +229,14 @@ void Server::cleanup_openssl() {
     EVP_cleanup();
 }
 
-void Server::create_context() {
+void Server::create_openssl_context(const std::string& cert_filename, const std::string& key_filename) {
     const SSL_METHOD *method;
 
     method = SSLv23_server_method();
 
     ctx = SSL_CTX_new(method);
     if (!ctx) {
-	perror("Unable to create SSL context");
+	std::cerr << "Unable to create SSL context." << std::endl;
 	ERR_print_errors_fp(stderr);
 	exit(EXIT_FAILURE);
     }
@@ -240,12 +244,12 @@ void Server::create_context() {
     SSL_CTX_set_ecdh_auto(ctx, 1);
 
     /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx, "crt/crt", SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ctx, cert_filename.c_str(), SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
 	exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, "crt/key", SSL_FILETYPE_PEM) <= 0 ) {
+    if (SSL_CTX_use_PrivateKey_file(ctx, key_filename.c_str(), SSL_FILETYPE_PEM) <= 0 ) {
         ERR_print_errors_fp(stderr);
 	exit(EXIT_FAILURE);
     }
