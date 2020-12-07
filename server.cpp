@@ -23,11 +23,7 @@ Server::Server(std::string _root,
 	       std::string cert_filename,
 	       std::string key_filename,
 	       int _port,
-	       int _maxthreads) {
-    root = _root;
-    port = _port;
-    maxthreads = _maxthreads;
-    
+	       int _threads) : port(_port), server_fd(socket(AF_INET, SOCK_STREAM, 0)), threads(_threads), root(_root) {
     init_openssl();
     create_openssl_context(cert_filename, key_filename);
 
@@ -40,7 +36,7 @@ Server::Server(std::string _root,
 	sigaction(SIGPIPE, &sigpipe, NULL);
     }
     
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+    if (server_fd == 0) {
 	throw std::runtime_error("Socket init failed.");
     }
     
@@ -75,15 +71,15 @@ void Server::accept_once() {
 	throw std::runtime_error("Accept() failed.");
     }
 
-    while (numthreads >= maxthreads);
-    
-    std::thread serve_requesting_thread(&Server::serve_requesting_socket, this, std::ref(new_fd));
-    serve_requesting_thread.detach();
+    connections_queue.enqueue(new_fd);
 }
 
-void Server::serve_requesting_socket(const int& fd) {
-    ++numthreads;
-    
+void Server::worker_thread_loop() {
+    while (true)
+	serve_requesting_socket(connections_queue.dequeue());
+}
+
+void Server::serve_requesting_socket(const int fd) {
     SecureSocket new_socket;
     
     try {
@@ -113,8 +109,6 @@ void Server::serve_requesting_socket(const int& fd) {
     std::string response_raw = response->generate();
 
     new_socket.write(response_raw);
-
-    --numthreads;
 }
 
 extern "C" void Server::loop_sigint_handler(int signum) {
@@ -123,6 +117,8 @@ extern "C" void Server::loop_sigint_handler(int signum) {
 }
 
 void Server::loop() {
+    for (int i = 0; i < threads; ++i)
+	(std::thread(&Server::worker_thread_loop, this)).detach();
     
     // there is an assumption only one loop can be running at a time
     loop_running = true;
@@ -133,7 +129,7 @@ void Server::loop() {
     sigint_new.sa_handler = &Server::loop_sigint_handler;
     sigint_new.sa_flags = 0;
     sigaction(SIGINT, &sigint_new, &sigint_old);
-
+    
     std::cout << "Entering a server loop... Press CTRL+C to exit." << std::endl;
     
     while (loop_running) {

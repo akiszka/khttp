@@ -1,5 +1,5 @@
 CC = clang++
-CFLAGS = -std=c++20 -O3 -g -Wall -Wextra -D_FORTIFY_SOURCE=2
+CFLAGS = -std=c++17 -O3 -g -Wall -Wextra -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=700
 LINKFLAGS = -lssl -lcrypto -lpthread
 
 OBJS = main.o server.o request.o response.o securesocket.o

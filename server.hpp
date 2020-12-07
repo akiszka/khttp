@@ -3,6 +3,7 @@
 
 #include "request.hpp"
 #include "response.hpp"
+#include "threadsafequeue.hpp"
 
 #include <netinet/in.h>
 #include <memory>
@@ -15,11 +16,11 @@
 #include <openssl/ssl.h>
 
 class Server {
-    int port;
-    int server_fd;
+    const int port;
+    const int server_fd;
     
-    std::atomic_int numthreads = 0;
-    int maxthreads;
+    const int threads;
+    ThreadsafeQueue<int> connections_queue;
     
     int opt = 1;
     struct sockaddr_in address;
@@ -27,12 +28,13 @@ class Server {
 
     SSL_CTX *ctx;
     
-    std::filesystem::path root;
+    const std::filesystem::path root;
 
     std::filesystem::path find_file(std::filesystem::path requested_path);
     static std::string extension_to_mimetype(std::string extension);
-    
-    void serve_requesting_socket(const int& fd);
+
+    void worker_thread_loop();
+    void serve_requesting_socket(const int fd);
     std::unique_ptr<Response> process_request(const Request& req);
     
     static void loop_sigint_handler(int signum);
@@ -42,7 +44,7 @@ class Server {
     void init_openssl();
     
 public:
-    Server(std::string _root, std::string cert_filename, std::string key_filename, int _port = 8080, int _maxthreads = 12);
+    Server(std::string _root, std::string cert_filename, std::string key_filename, int _port = 8080, int _threads = 4);
     ~Server();
     void accept_once();
     void loop();
