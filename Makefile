@@ -1,5 +1,7 @@
+VERSION = `cat ./VERSION`
+
 CC = clang++
-CFLAGS = -std=c++17 -O3 -g -Wall -Wextra -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=700
+CFLAGS = -std=c++17 -O3 -g -Wall -Wextra -D_FORTIFY_SOURCE=2 -D_XOPEN_SOURCE=700 -DKHTTP_VERSION=\"${VERSION}\"
 LINKFLAGS = -lssl -lcrypto -lpthread
 
 OBJS = main.o server.o request.o response.o securesocket.o

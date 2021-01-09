@@ -137,12 +137,12 @@ void Server::loop() {
 	    accept_once();
 	} catch (...) {}
     }
-
-    std::cout << "Exiting the loop..." << std::endl;
-    std::cout.flush();
     
     // after the server stops running, re-establish the old handler
     sigaction(SIGINT, &sigint_old, NULL);
+
+    std::cout << "The process will now terminate, but it's nothing to worry about." << std::endl;
+    std::terminate();
 }
 
 std::filesystem::path Server::find_file(std::filesystem::path requested_path) {

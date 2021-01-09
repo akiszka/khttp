@@ -5,15 +5,12 @@
 #include "response.hpp"
 #include "threadsafequeue.hpp"
 
-#include <netinet/in.h>
-#include <memory>
-#include <vector>
 #include <string>
 #include <filesystem>
 #include <fstream>
-#include <memory>
-#include <atomic>
+
 #include <openssl/ssl.h>
+#include <netinet/in.h>
 
 class Server {
     const int port;

@@ -38,7 +38,7 @@ Response Response::generate_error_message(const Status _status, std::string&& me
     Response response;
     response.set_header("Content-Type", "text/html");
     response.set_status(_status);
-    response.set_body("<h1><marquee>" + response.get_status_message() + "</marquee></h1><br>" + message);
+    response.set_body("<h1>" + response.get_status_message() + "</h1><br>" + message + "<hr><small>KHTTP/" KHTTP_VERSION "</small>");
     return response;
 }
 
