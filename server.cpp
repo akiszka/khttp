@@ -35,13 +35,13 @@ Server::Server(std::string _root,
 	sigpipe.sa_flags = 0;
 	sigaction(SIGPIPE, &sigpipe, NULL);
     }
-    
+
     if (server_fd == 0) {
 	throw std::runtime_error("Socket init failed.");
     }
-    
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, 
-		   &opt, sizeof(opt))) { 
+
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT,
+		   &opt, sizeof(opt))) {
         throw std::runtime_error("Setting socket options failed");
     }
 
@@ -49,7 +49,7 @@ Server::Server(std::string _root,
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons( port );
 
-    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) { 
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) {
         throw std::runtime_error("Socket binding failed.");
     }
 
@@ -65,7 +65,7 @@ Server::~Server() {
 
 void Server::accept_once() {
     int new_fd;
-    
+
     if ((new_fd = accept(server_fd, (struct sockaddr *)&address,
 			     (socklen_t*)&addrlen))<0) {
 	throw std::runtime_error("Accept() failed.");
@@ -81,7 +81,7 @@ void Server::worker_thread_loop() {
 
 void Server::serve_requesting_socket(const int fd) {
     SecureSocket new_socket;
-    
+
     try {
 	new_socket.init(fd, ctx);
     } catch (const std::runtime_error& re) {
@@ -93,7 +93,7 @@ void Server::serve_requesting_socket(const int fd) {
 	// read the data that was sent
 	std::string request_raw;
 	new_socket.read(request_raw);
-	
+
 	// now a request object is generated and processed
 	// TODO: make this function swappable
 	Request request(std::move(request_raw));
@@ -103,9 +103,9 @@ void Server::serve_requesting_socket(const int fd) {
 	    Response::generate_error_message(Response::INTERNAL_SERVER_ERROR,
 					     "Error."));
 	std::cerr << e.what() << std::endl;
-	    
+
     }
-    
+
     std::string response_raw = response->generate();
 
     new_socket.write(response_raw);
@@ -119,25 +119,25 @@ extern "C" void Server::loop_sigint_handler(int signum) {
 void Server::loop() {
     for (int i = 0; i < threads; ++i)
 	(std::thread(&Server::worker_thread_loop, this)).detach();
-    
+
     // there is an assumption only one loop can be running at a time
     loop_running = true;
-    
+
     // add a new handler for ctrl+c
     struct sigaction sigint_new{};
     struct sigaction sigint_old{};
     sigint_new.sa_handler = &Server::loop_sigint_handler;
     sigint_new.sa_flags = 0;
     sigaction(SIGINT, &sigint_new, &sigint_old);
-    
+
     std::cout << "Entering a server loop... Press CTRL+C to exit." << std::endl;
-    
+
     while (loop_running) {
 	try {
 	    accept_once();
 	} catch (...) {}
     }
-    
+
     // after the server stops running, re-establish the old handler
     sigaction(SIGINT, &sigint_old, NULL);
 
@@ -147,11 +147,11 @@ void Server::loop() {
 
 std::filesystem::path Server::find_file(std::filesystem::path requested_path) {
     std::filesystem::path path = root / requested_path.relative_path();
-	
+
     if (std::filesystem::is_directory(path)) {
 	path /= "index.html";
     }
-    
+
     if (!std::filesystem::exists(path)) {
 	throw std::invalid_argument("Doesn't exist");
     }
@@ -172,6 +172,8 @@ std::string Server::extension_to_mimetype(std::string extension) {
 	return "image/png";
     else if (extension == ".txt")
 	return "text/plain";
+    else if (extension == ".wasm")
+	return "application/wasm";
     else
 	return "application/octet-stream";
 }
@@ -182,8 +184,8 @@ std::unique_ptr<Response> Server::process_request(const Request& req) {
 	    Response::generate_error_message(Response::BAD_REQUEST,
 		"Wrong request method."));
     }
-    
-    
+
+
     std::filesystem::path filename;
 
     // try to open the file or index.html
@@ -201,7 +203,7 @@ std::unique_ptr<Response> Server::process_request(const Request& req) {
     }
 
     std::ifstream requested_file(filename);
-    
+
     // read the requested file into a string
     std::string contents;
     requested_file.seekg(0, std::ios::end);
@@ -210,8 +212,8 @@ std::unique_ptr<Response> Server::process_request(const Request& req) {
     requested_file.read(&contents[0], contents.size());
 
     auto response = std::make_unique<Response>(contents);
-    response->set_header("Content-Type", extension_to_mimetype(filename.extension()));    
-	
+    response->set_header("Content-Type", extension_to_mimetype(filename.extension()));
+
     return response;
 }
 

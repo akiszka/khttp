@@ -44,12 +44,12 @@ Response Response::generate_error_message(const Status _status, std::string&& me
 
 std::string Response::get_status_message() const {
     std::string message;
-    
+
     switch (status) {
     case OK: message = "200 OK"; break;
     case CREATED: message = "201 Created"; break;
     case NO_CONTENT: message = "204 No Content"; break;
-	
+
     case MOVED_PERMANENTLY: message = "301 Moved Permanently"; break;
     case MOVED_TEMPORARILY: message = "302 Found"; break;
 
